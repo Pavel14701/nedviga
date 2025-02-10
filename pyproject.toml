@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "nedviga"
+version = "0.1.0"
+description = ""
+authors = ["Pavel14701 <pavelkutia@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = "^2.0.38"
+alembic = "^1.14.1"
+asyncpg = "^0.30.0"
+litestar = "^2.14.0"
+pydantic = "^2.10.6"
+dishka = "^1.4.2"
+redis = "^5.2.1"
+faststream = "^0.5.34"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
