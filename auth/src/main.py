@@ -8,7 +8,7 @@ from litestar import Litestar
 
 
 from auth.src.config import Config
-from auth.src.controllers.amqp import RabbitController
+from auth.src.controllers.amqp import AuthMQController
 from auth.src.controllers.http import AuthController
 from auth.src.ioc import AppProvider
 
@@ -22,7 +22,7 @@ async def get_faststream_app() -> FastStream:
         broker = await container.get(RabbitBroker)
         faststream_app = FastStream(broker)
         faststream_integration.setup_dishka(container, faststream_app, auto_inject=True)
-        broker.include_routers(RabbitController)
+        broker.include_router(AuthMQController)
     return faststream_app
 
 
@@ -40,3 +40,8 @@ def get_app() -> Litestar:
     litestar_app.on_startup.append(faststream_app.broker.start)
     litestar_app.on_shutdown.append(faststream_app.broker.close)
     return litestar_app
+
+if __name__ == "__main__":
+    import uvicorn
+    app = get_app()
+    uvicorn.run(app)
