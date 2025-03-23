@@ -22,6 +22,7 @@ argon2-cffi-bindings = "^21.2.0"
 dishka = "^1.4.2"
 aiosmtpd = "^1.4.6"
 aiosmtplib = "^4.0.0"
+aio-pika = "^9.5.5"
 
 
 [build-system]

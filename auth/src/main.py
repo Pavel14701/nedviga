@@ -12,6 +12,7 @@ from auth.src.controllers.amqp import AuthMQController
 from auth.src.controllers.http import AuthController
 from auth.src.ioc import AppProvider
 
+
 config = Config()
 hasher = PasswordHasher()
 container = make_async_container(AppProvider(), context={Config: config, PasswordHasher: hasher})

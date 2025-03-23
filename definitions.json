@@ -1,0 +1,95 @@
+{
+    "vhosts": [
+      {
+        "name": "vhost"
+      }
+    ],
+    "exchanges": [
+      {
+        "name": "delayed_delete_exchange",
+        "vhost": "vhost",
+        "type": "direct",
+        "durable": true
+      },
+      {
+        "name": "delete_exchange",
+        "vhost": "vhost",
+        "type": "direct",
+        "durable": true
+      },
+      {
+        "name": "send_exchange",
+        "vhost": "vhost",
+        "type": "direct",
+        "durable": true
+      },
+      {
+        "name": "auth_exchange",
+        "vhost": "vhost",
+        "type": "direct",
+        "durable": true
+      }
+    ],
+    "queues": [
+      {
+        "name": "delayed_rotten_user",
+        "vhost": "vhost",
+        "durable": true,
+        "arguments": {
+          "x-message-ttl": 1800000,
+          "x-dead-letter-exchange": "delete_exchange",
+          "x-dead-letter-routing-key": "delete_task_route"
+        }
+      },
+      {
+        "name": "delete_rotten_user",
+        "vhost": "vhost",
+        "durable": true
+      },
+      {
+        "name": "send_register_confirmation",
+        "vhost": "vhost",
+        "durable": true
+      },
+      {
+        "name": "get_auth_data",
+        "vhost": "vhost",
+        "durable": true
+      },
+      {
+        "name": "return_auth_data",
+        "vhost": "vhost",
+        "durable": true
+      }
+    ],
+    "bindings": [
+      {
+        "source": "delete_exchange",
+        "vhost": "vhost",
+        "destination": "delete_rotten_user",
+        "destination_type": "queue",
+        "routing_key": "delete_task_route"
+      },
+      {
+        "source": "send_exchange",
+        "vhost": "vhost",
+        "destination": "send_register_confirmation",
+        "destination_type": "queue",
+        "routing_key": "register_confirmation_route"
+      },
+      {
+        "source": "auth_exchange",
+        "vhost": "vhost",
+        "destination": "get_auth_data",
+        "destination_type": "queue",
+        "routing_key": "get_auth_data"
+      },
+      {
+        "source": "auth_exchange",
+        "vhost": "vhost",
+        "destination": "return_auth_data",
+        "destination_type": "queue",
+        "routing_key": "return_auth_data"
+      }
+    ]
+  }
