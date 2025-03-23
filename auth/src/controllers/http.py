@@ -42,13 +42,13 @@ class AuthController(Controller):
     @inject
     async def signup(
         self,
-        body: Annotated[UserSignupRequest, Body(description="User registration data.")],
+        data: Annotated[UserSignupRequest, Body(default=..., description="User registration data.")],
         interactor: Depends[SignupInteractor]
     ) -> UserSignupResponse:
         signup_dto = SignupDTO(
-            username=body.username,
-            email=body.email,
-            password=body.password
+            username=data.username,
+            email=data.email,
+            password=data.password
         )
         new_user_dm = await interactor(signup_dto)
         return UserSignupResponse(
@@ -57,7 +57,7 @@ class AuthController(Controller):
         )
 
     @get(
-        path="/signup/{user_uuid}",
+        path="/signup/{user_uuid:str}",
         operation_id="confirm_signup",
         summary="Registration Confirmation",
         description="Endpoint for confirming user registration by UUID",
@@ -85,13 +85,13 @@ class AuthController(Controller):
     @inject
     async def login_for_access_token(
         self,
-        body: Annotated[AuthForm, Body(description="User registration data.")],
+        data: Annotated[AuthForm, Body(default=..., description="User authenification data.")],
         interactor: Depends[LoginInteractor]
     ) -> TokenResponse:
         params = LoginDTO(
-            username=body.username,
-            phone=body.phone,
-            password=body.password
+            username=data.username,
+            phone=data.phone,
+            password=data.password
         )
         tokens_dm = await interactor(params)
         if not tokens_dm:
@@ -114,10 +114,10 @@ class AuthController(Controller):
     )
     @inject
     async def refresh_access_token(
-        body: Annotated[TokensForm, Body(description="User tokens for authentification.")],
+        data: Annotated[TokensForm, Body(default=..., description="User tokens for authentification.")],
         interactor: Depends[RefreshTokenInteractor]
     ) -> TokenResponse:
-        tokens = TokensDTO(access_token=body.access_token, refresh_token=body.refresh_token)
+        tokens = TokensDTO(access_token=data.access_token, refresh_token=data.refresh_token)
         if tokens_dm := await interactor(tokens):
             return TokenResponse(**tokens_dm)
         raise HTTPException(
@@ -136,12 +136,12 @@ class AuthController(Controller):
     @inject
     async def logout(
         self,
-        body: Annotated[TokensForm, Body(description="User tokens for authentification.")],
+        data: Annotated[TokensForm, Body(default=..., description="User tokens for authentification.")],
         interactor: Depends[LoginInteractor]
     ) -> bool:
         params = TokensDTO(
-            access_token=body.access_token,
-            refresh_token=body.refresh_token
+            access_token=data.access_token,
+            refresh_token=data.refresh_token
         )
         result = await interactor(params)
         if not result:
@@ -163,10 +163,10 @@ class AuthController(Controller):
     @inject
     async def verify_token(
         self,
-        token: Annotated[str, Body(description="User access token for authentification.")],
+        data: Annotated[str, Body(default=..., description="User access token for authentification.")],
         interactor: Depends[VerifyTokenInteractor]
     ) -> UserAuthResponse:
-        user_dm = await interactor(token)
+        user_dm = await interactor(data)
         if not user_dm:
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,

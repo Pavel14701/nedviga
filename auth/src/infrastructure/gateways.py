@@ -16,7 +16,7 @@ from auth.src.application.interfaces import (
     RedisService, 
     SendConfirmationEmail
 )
-from src.config import SecurityConfig
+from auth.src.config import SecurityConfig
 from auth.src.domain.entities import (
     GetUserDM,
     RevokeTokenDM,

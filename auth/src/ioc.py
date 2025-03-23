@@ -17,7 +17,7 @@ from auth.src.application.interactors import (
     VerifyTokenInteractor,
     LogoutInteractor
 )
-from auth.src.config import Config
+from auth.src.config import AppConfig, Config, SecurityConfig
 from auth.src.infrastructure.broker import new_broker
 from auth.src.infrastructure.cache import new_redis_client
 from auth.src.infrastructure.database import new_session_maker
@@ -30,6 +30,14 @@ from auth.src.infrastructure.gateways import (
 
 class AppProvider(Provider):
     config = from_context(provides=Config, scope=Scope.APP)
+
+    @provide(scope=Scope.APP)
+    def get_security_config(self, config: Config) -> SecurityConfig:
+        return config.security
+
+    @provide(scope=Scope.APP)
+    def get_app_config(self, config: Config) -> AppConfig:
+        return config.app
 
     hasher = from_context(provides=PasswordHasher, scope=Scope.APP)
 

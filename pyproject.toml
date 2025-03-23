@@ -12,7 +12,7 @@ sqlalchemy = "^2.0.38"
 alembic = "^1.14.1"
 asyncpg = "^0.30.0"
 litestar = "^2.14.0"
-pydantic = "^2.10.6"
+pydantic = {extras = ["email"], version = "^2.10.6"}
 redis = "^5.2.1"
 faststream = {extras = ["rabbitmq"], version = "^0.5.36"}
 python-jose = "^3.3.0"

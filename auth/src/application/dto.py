@@ -1,5 +1,5 @@
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
@@ -8,15 +8,15 @@ class SignupDTO:
     lastname: str
     username: str
     email: str
-    phone: Optional[str] = None
     password: str
+    phone: Optional[str] = field(default=None)
 
 
 @dataclass(slots=True)
 class LoginDTO:
-    username: Optional[str] = None
-    phone: Optional[str] = None
     password: str
+    username: Optional[str] = field(default=None)
+    phone: Optional[str] = field(default=None)
 
 
 @dataclass(slots=True)

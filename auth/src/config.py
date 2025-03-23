@@ -1,12 +1,18 @@
 from os import environ as env
 
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, field_validator
 
 
 class AppConfig(BaseModel):
-    debug: bool = Field(default=False, alias='APP_DEBUG')
+    log_level: str = Field(default="info", alias='APP_LOG_LEVEL')
     secret_key: str = Field(alias='APP_SECRET_KEY')
     allowed_hosts: list[str] = Field(default_factory=list, alias='APP_ALLOWED_HOSTS')
+
+    @field_validator("allowed_hosts", mode="before")
+    def split_allowed_hosts(cls, value):
+        if isinstance(value, str):
+            return value.split(",")
+        return value
 
 
 class SecurityConfig(BaseModel):

@@ -12,12 +12,12 @@ class BaseDM:
 class UserDM(BaseDM):
     uuid: str
     username: str
-    firstname: Optional[str] = None
-    lastname: Optional[str] = None
     email: str
     phone_number: str
     hashed_password: str
     is_active: bool
+    firstname: Optional[str] = field(default=None)
+    lastname: Optional[str] = field(default=None)
 
 
 @dataclass(slots=True)
@@ -35,7 +35,7 @@ class UserDataDM(BaseDM):
     username: str
     is_active: bool = field(default=False)
     role: str = field(default="user")
-    exp: Optional[datetime] = None
+    exp: Optional[datetime] = field(default=None)
 
 
 @dataclass(slots=True)

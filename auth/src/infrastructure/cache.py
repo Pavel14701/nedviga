@@ -1,5 +1,5 @@
 from redis.asyncio import ConnectionPool
-from src.config import RedisConfig
+from auth.src.config import RedisConfig
 
 def new_redis_client(redis_config: RedisConfig) -> ConnectionPool:
     return ConnectionPool(
