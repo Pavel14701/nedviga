@@ -1,180 +1,201 @@
-from typing import Optional, Any
-import json
-from redis.asyncio import Redis
+from typing import Optional
 
-from sqlalchemy import Row
-from litestar.security.jwt.auth import OAuth2Login
+from argon2 import PasswordHasher
 
-import interfaces
-import dto
-from src.domain import entities
+from auth.src.application.interfaces import (
+    DBSession, 
+    DeleteUserTask, 
+    SendConfirmationEmail, 
+    UUIDGenerator, 
+    Auth, 
+    RedisService,
+    Cruds
+)
+from auth.src.application.dto import (
+    LoginDTO, 
+    SignupDTO, 
+    TokensDTO
+)
+from auth.src.config import AppConfig
+from auth.src.domain.entities import (
+    DeleteUserTaskDM,
+    GetUserDM, 
+    RevokeTokenDM, 
+    RevokeTokensDM, 
+    SendConfirmEmailDM, 
+    TokenDM, 
+    UserDataDM, 
+    UserDM
+)
+
 
 class SignupInteractor:
     def __init__(
         self,
-        db_session: interfaces.DBSession,
-        signup_gateway: interfaces.SignupInterface,
+        config: AppConfig,
+        uuid_generator: UUIDGenerator,
+        hasher: PasswordHasher,
+        cache_gateway: RedisService,
+        task_gateway: DeleteUserTask,
+        email_gateway: SendConfirmationEmail,
     ) -> None:
-        self._db_session = db_session
-        self._signup_gateway = signup_gateway
-
-    async def __call__(self, data: entities.SaveUserDM) -> None:
-        await self._signup_gateway.signup(data)
-        await self._db_session.commit()
-
-
-class SaltGeneratorInteractor:
-    def __init__(
-        self,
-        generator_gateway: interfaces.SaltGeneratorInterface
-    ) -> None:
-        self._generator_gateway = generator_gateway
-
-    async def __call__(self) -> str:
-        return await self._generator_gateway.generate_salt()
-
-
-class HashPasswordInteractor:
-    def __init__(
-        self,
-        hash_gateway: interfaces.PasswordHasherInterface
-    ) -> None:
-        self._hash_gateway = hash_gateway
-
-    async def __call__(self, dto: dto.HashPasswordDTO) -> str:
-        data = entities.HashPasswordMethodDM(
-            password = dto.password,
-            salt = dto.salt
-        )
-        return await self._hash_gateway.hash_password_with_salt(data)
-
-
-class LoadUserFromCacheInteractor:
-    def __init__(
-        self,
-        redis_client: Redis
-    ) -> None:
-        self._redis_client=redis_client
-
-    async def __call__(self, dto: dto.TokenDTO) -> Optional[entities.SaveUserDM]:
-        token_dm = entities.TokenDM(token=dto.token)
-        temp_user_data = await self._redis_client.get(token_dm.token)
-        if temp_user_data is None:
-            return None
-        user:dict = json.loads(temp_user_data)
-        return entities.SaveUserDM(
-            uuid=user["uuid"],
-            username=user["username"],
-            firstname=user["firstname"],
-            lastname=user["lastname"],
-            email=user["email"],
-            hashed_password=user["hashed_password"],
-            salt=user["salt"]
-        )
-
-
-class DeleteUserFromCacheInteractor:
-    def __init__(
-        self,
-        redis_client: Redis
-    ) -> None:
-        self._redis_client=redis_client
-
-    async def __call__(self, dto: dto.TokenDTO) -> None:
-        token_dm = entities.TokenDM(token=dto.token)
-        await self._redis_client.delete(f'user_{token_dm.token}')
-
-
-class SaveUserCacheInteractor:
-    def __init__(
-        self,
-        redis_client: Redis
-    ) -> None:
-        self._redis_client = redis_client
-
-    async def __call__(self, dto: dto.UserCacheDTO) -> None:
-        user_cache_dm = entities.SaveUserCacheDM(
-            username=dto.username,
-            firstname=dto.firstname,
-            lastname=dto.lastname,
-            email=dto.email,
-            hashed_password=dto.hashed_password,
-            salt=dto.salt
-        )
-        await self._redis_client.setex(name=f'user_{dto.token}',
-            value=user_cache_dm.model_dump_json())
-
-
-class CreateNewUserInteractor:
-    def __init__(
-            self,
-            user_gateway: interfaces.CreateNewUserInterface,
-            uuid_generator: interfaces.UUIDGenerator,
-    ) -> None:
-        self._user_gateway = user_gateway
+        self._config = config
         self._uuid_generator = uuid_generator
+        self._hasher = hasher
+        self._cache_gateway = cache_gateway
+        self._task_gateway = task_gateway
+        self._email_gateway = email_gateway
 
-    async def __call__(self, dto: dto.NewUserDTO) -> Optional[Row[Any]]:
-        uuid = str(self._uuid_generator())
-        user = entities.NewUserDM(
-            uuid=uuid,
-            username=dto.username,
-            firstname=dto.firstname,
-            lastname=dto.lastname,
-            email=dto.email,
-            password=dto.password
+    async def __call__(self, params: SignupDTO) -> UserDataDM:
+        new_user_uuid = self._uuid_generator()
+        hashed_password = self._hasher.hash(
+            params.password + self._config.secret_key
         )
-        return await self._user_gateway.create_new_user(user)
+        user_dm = UserDM(
+            uuid=new_user_uuid,
+            firstname=params.firstname,
+            lastname=params.lastname,
+            username=params.username or params.email,
+            email=params.email,
+            phone_number=params.phone or None,
+            hashed_password=hashed_password,
+            is_active=False,
+        )
+        await self._cache_gateway.save_user(user_dm)
+        delete_user_dm = DeleteUserTaskDM(user_uuid=new_user_uuid)
+        await self._task_gateway.schedule_user_deletion(delete_user_dm)
+        send_mail_dm = SendConfirmEmailDM(
+            uuid=new_user_uuid,
+            email=params.email,
+            username=params.username or params.email
+        )
+        await self._email_gateway.send_confirmation_email(send_mail_dm)
+        return UserDataDM(**user_dm)
+
+
+class ConfirmSignupInteractor:
+    def __init__(
+        self,
+        cache_gateway: RedisService,
+        signup_gateway: Cruds,
+        db_session: DBSession,
+        auth_gateway: Auth,
+    ) -> None:
+        self._cache_gateway = cache_gateway
+        self._signup_gateway = signup_gateway
+        self._db_session = db_session
+        self._auth_gateway = auth_gateway
+
+    async def __call__(self, user_uuid: str) -> TokenDM:
+        await self._cache_gateway.cancel_shedule_user_deletion(user_uuid)
+        user_dm = await self._cache_gateway.load_user(user_uuid=user_uuid)
+        await self._cache_gateway.delete_user(user_uuid=user_uuid)
+        new_user_dm = await self._signup_gateway.signup(user_dm)
+        await self._db_session.commit()
+        access_token = await self._auth_gateway.create_access_token(new_user_dm)
+        refresh_token= await self._auth_gateway.create_refresh_token(new_user_dm)
+        return TokenDM(
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
+
+
+class LoginInteractor:
+    def __init__(
+        self,
+        config: AppConfig,
+        cache_gateway: RedisService,
+        user_gateway: Cruds,
+        hasher: PasswordHasher,
+        db_session: DBSession,
+        auth_gateway: Auth,
+    ) -> None:
+        self._config = config
+        self._cache_gateway = cache_gateway
+        self._user_gateway = user_gateway
+        self._hasher = hasher
+        self._db_session = db_session
+        self._auth_gateway = auth_gateway
+
+
+    async def __call__(self, params: LoginDTO) -> Optional[TokenDM]:
+        get_user_dm = GetUserDM(**params)
+        user_password_dm = await self._user_gateway.get_user_data(get_user_dm)
+        if not user_password_dm or not user_password_dm.is_active:
+            return None
+        hashed_password = self._hasher.hash(
+            params.password + self._config.secret_key
+        )
+        if hashed_password == user_password_dm.hashed_password:
+            user_dm = UserDM(**user_password_dm)
+            access_token = await self._auth_gateway.create_access_token(user_dm)
+            refresh_token= await self._auth_gateway.create_refresh_token(user_dm)
+            return TokenDM(
+                access_token=access_token,
+                refresh_token=refresh_token
+            ) 
+        return None
+
+
+class RefreshTokenInteractor:
+    def __init__(
+        self,
+        cache_gateway: RedisService,
+        auth_gateway: Auth
+    ) -> None:
+        self._cache_gateway = cache_gateway
+        self._auth_gateway = auth_gateway
+
+    async def __call__(self, params: TokensDTO) -> Optional[TokenDM]:
+        token_dm = RevokeTokenDM(token=params.refresh_token, token_type="refresh")
+        if await self._cache_gateway.is_token_revoked(token_dm):
+            user_dm = await self._auth_gateway.verify_refresh_token(params.refresh_token)
+            if not user_dm:
+                return None
+            new_access_token = await self._auth_gateway.create_access_token(user_dm)
+            return TokenDM(
+                access_token=new_access_token,
+                refresh_token=params.refresh_token
+            )
+        return None
 
 
 class VerifyTokenInteractor:
     def __init__(
         self,
-        verify_gateway: interfaces.VerifyTokenInterface,
+        verify_gateway: Auth,
+        cache_gateway: RedisService,
     ) -> None:
         self._verify_gateway = verify_gateway
+        self._cache_gateway = cache_gateway
 
-    async def __call__(self, dto: dto.TokenDTO) -> Optional[str]:
-        token = entities.TokenDM(token = dto.token)
-        return await self._verify_gateway.verify_token(token)
+    async def __call__(self, token: str) -> Optional[UserDataDM]:
+        params = RevokeTokenDM(token=token, token_type="access")
+        if await self._cache_gateway.is_token_revoked(params):
+            return await self._verify_gateway.verify_access_token(token)
+        return None
 
 
-class CreateRefreshTokenInteractor:
+class LogoutInteractor:
     def __init__(
         self,
-        create_gateway: interfaces.CreateRefreshTokenInterface
+        cache_gateway: RedisService,
+        auth_gateway: Auth,
     ) -> None:
-        self._create_gateway = create_gateway
+        self._cache_gateway = cache_gateway
+        self._auth_gateway = auth_gateway
 
-    async def __call__(self, dto: dto.AccessRefreshTokenDTO) -> str:
-        data = entities.AccessRefreshTokenDM(
-            data=dto.data,
-            expires_timedelta=dto.expires_timedelta
+    async def __call__(self, params: TokensDTO) -> Optional[bool]:
+        access_data = await self._auth_gateway.verify_access_token(params.access_token)
+        refresh_data = await self._auth_gateway.verify_refresh_token(params.refresh_token)
+        if not access_data or not refresh_data:
+            return None
+        access_exp = access_data.exp
+        refresh_exp = refresh_data.exp
+        revoke_dm = RevokeTokensDM(
+            access_token=params.access_token,
+            access_exp=access_exp,
+            refresh_token=params.refresh_token,
+            refresh_exp=refresh_exp
         )
-        return await self._create_gateway.create_refresh_token(data)
-
-
-class CreateAccessTokenInteractor:
-    def __init__(
-        self,
-        create_gateway: interfaces.CreateAccessTokenInterface
-    ) -> None:
-        self._create_gateway = create_gateway
-
-    async def __call__(self, dto: dto.AccessRefreshTokenDTO) -> str:
-        config = entities.AccessRefreshTokenDM(
-            data=dto.data,
-            expires_timedelta=dto.expires_timedelta
-        )
-        return await self._create_gateway.create_access_token(config)
-
-
-class GetUserDataInteractor:
-    def __init__(
-        self,
-        user_gateway: interfaces.GetUserDataInterface
-    ) -> None:
-        self._user_gateway = user_gateway
-
-    async def __call__(self, form_data: OAuth2Login) -> entities.UserDataDM:
-        return await self._user_gateway.get_user_data(form_data)
+        return await self._cache_gateway.save_revoked_tokens(revoke_dm)

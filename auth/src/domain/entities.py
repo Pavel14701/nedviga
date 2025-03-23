@@ -1,64 +1,78 @@
+from datetime import datetime
 from typing import Optional
-from datetime import timedelta
-
-from pydantic import BaseModel
-from fastapi_mail import FastMail
+from dataclasses import field, dataclass, asdict
 
 
-class UserBase(BaseModel):
+class BaseDM:
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class UserDM(BaseDM):
+    uuid: str
     username: str
     firstname: Optional[str] = None
     lastname: Optional[str] = None
     email: str
-
-
-class NewUserDM(UserBase):
-    uuid: str
-    password: str
-
-
-class SaveUserCacheDM(UserBase):
-    token: Optional[str] = None
+    phone_number: str
     hashed_password: str
-    salt: str
-
-
-class SaveUserDM(UserBase):
-    uuid: str
-    hashed_password: str
-    salt: str
-    is_active: bool = True
-
-
-class TokenDM(BaseModel):
-    token: str
-
-
-class AccessRefreshTokenDM(BaseModel):
-    data: dict
-    expires_timedeta: Optional[timedelta] = None 
-
-
-class HashPasswordMethodDM(BaseModel):
-    password: str
-    salt: str
-
-
-class MailSenderDM(BaseModel):
-    fm: FastMail
-    email: str
-    username: str
-    token: str
-
-
-class UserDataDM(BaseModel):
-    username: str
-    email: str
-    hashed_password: str
-    salt: str
     is_active: bool
 
 
-class AuthForm(BaseModel):
+@dataclass(slots=True)
+class UserPasswordDM(BaseDM):
+    hashed_password: str
+    uuid: str
     username: str
-    password: str
+    is_active: bool
+    role: str
+
+
+@dataclass(slots=True)
+class UserDataDM(BaseDM):
+    uuid: str
+    username: str
+    is_active: bool = field(default=False)
+    role: str = field(default="user")
+    exp: Optional[datetime] = None
+
+
+@dataclass(slots=True)
+class TokenDM(BaseDM):
+    access_token: str
+    refresh_token: str
+    bearer: str = field(default="Bearer")
+
+
+@dataclass(slots=True)
+class RevokeTokensDM:
+    access_token: str
+    access_exp: float
+    refresh_token: str
+    refresh_exp: float
+
+
+@dataclass(slots=True)
+class DeleteUserTaskDM(BaseDM):
+    user_uuid: str
+    delay: int
+
+
+@dataclass(slots=True)
+class SendConfirmEmailDM(BaseDM):
+    uuid: str
+    email: str
+    username: str
+
+
+@dataclass(slots=True)
+class GetUserDM:
+    phone: Optional[str]
+    username: Optional[str]
+
+
+@dataclass(slots=True)
+class RevokeTokenDM:
+    token: str
+    token_type: str

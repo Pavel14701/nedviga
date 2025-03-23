@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Pavel14701 <pavelkutia@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -12,12 +13,15 @@ alembic = "^1.14.1"
 asyncpg = "^0.30.0"
 litestar = "^2.14.0"
 pydantic = "^2.10.6"
-dishka = "^1.4.2"
 redis = "^5.2.1"
-faststream = "^0.5.34"
-fastapi-mail = "^1.4.2"
-fastapi = "^0.115.8"
+faststream = {extras = ["rabbitmq"], version = "^0.5.36"}
 python-jose = "^3.3.0"
+uvicorn = "^0.34.0"
+argon2-cffi = "^23.1.0"
+argon2-cffi-bindings = "^21.2.0"
+dishka = "^1.4.2"
+aiosmtpd = "^1.4.6"
+aiosmtplib = "^4.0.0"
 
 
 [build-system]

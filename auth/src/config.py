@@ -10,10 +10,11 @@ class AppConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
-    secret_key: str = Field(alias='OAUTH_SECRET')
+    secret_access_key: str = Field(alias='OAUTH_ACCESS_SECRET')
+    secret_refresh_key: str = Field(alias='OAUTH_REFRESH_SECRET')
     algorithm: str = Field(alias='OAUTH_ALGO')
     access_token_expire_minutes: int = Field(default=30, alias='ACCESS_TOKEN_EXPIRE_MINUTES')
-    refresh_access_toksen_expire_days: int = Field(default=7, alias='REFRESH_TOKEN_EXPIRE_DAYS')
+    refresh_access_token_expire_days: int = Field(default=7, alias='REFRESH_TOKEN_EXPIRE_DAYS')
 
 
 class PostgresConfig(BaseModel):
@@ -28,15 +29,15 @@ class RabbitMQConfig(BaseModel):
     host: str = Field(alias='RABBITMQ_HOST')
     port: int = Field(alias='RABBITMQ_PORT')
     login: str = Field(alias='RABBITMQ_USER')
-    password: str = Field(alias='RABBITMQ_PASS')
-
+    password: str = Field(alias='RABBITMQ_PASSWORD')
+    vhost: str = Field(alias='RABBITMQ_VHOST')
 
 class RedisConfig(BaseModel):
-    REDIS_PORT:str = Field(alias='REDIS_PORT')
-    REDIS_HOST:str = Field(alias='REDIS_HOST')
-    REDIS_DB:str = Field(alias='REDIS_DB')
-    REDIS_MAX_CONNECTIONS:int = Field(alias='REDIS_MAX_CONNECTIONS')
-    REDIS_CONFIRM_TIME:int = Field(alias='REDIS_CONFIRM_TIME')
+    REDIS_PORT: str = Field(alias='REDIS_PORT')
+    REDIS_HOST: str = Field(alias='REDIS_HOST')
+    REDIS_DB: str = Field(alias='REDIS_DB')
+    REDIS_MAX_CONNECTIONS: int = Field(alias='REDIS_MAX_CONNECTIONS')
+    REDIS_CONFIRM_TIME: int = Field(alias='REDIS_CONFIRM_TIME')
 
 
 class Config(BaseModel):

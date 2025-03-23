@@ -1,80 +1,83 @@
 from abc import abstractmethod
-from typing import Protocol, Optional, Any
+from typing import Protocol, Optional
 from uuid import UUID
 
-from sqlalchemy import Row
-from litestar.security.jwt.auth import (
-    OAuth2Login,
-    OAuth2PasswordBearerAuth,
+from argon2 import PasswordHasher
+
+
+from auth.src.domain.entities import (
+    DeleteUserTaskDM, 
+    GetUserDM, 
+    RevokeTokenDM, 
+    RevokeTokensDM, 
+    UserDM, 
+    UserDataDM, 
+    SendConfirmEmailDM, 
+    UserPasswordDM
 )
 
-from src.domain import entities
 
+class Auth(Protocol):
 
-class UUIDGenerator(Protocol):
-    def __call__(self) -> UUID:
-        ...
-
-
-class SaltGeneratorInterface(Protocol):
     @abstractmethod
-    async def generate_salt(self) -> str:
-        ...
+    async def create_access_token(self, params: UserDataDM) -> str: ...
 
-
-class PasswordHasherInterface(Protocol):
     @abstractmethod
-    async def hash_password_with_salt(self, data: entities.HashPasswordMethodDM) -> str:
-        ...
+    async def create_refresh_token(self, params: UserDataDM) -> str: ...
 
-
-class SignupInterface(Protocol):
     @abstractmethod
-    async def signup(self, data: entities.TokenDM) -> dict[str, str]:
-        ...
+    async def verify_access_token(self, token: str) -> Optional[UserDataDM]: ...
 
-
-class CreateAccessTokenInterface(Protocol):
     @abstractmethod
-    async def create_access_token(self, data: entities.AccessRefreshTokenDM) -> str:
-        ...
+    async def verify_refresh_token(self, token: str) -> Optional[UserDataDM]: ...
 
 
-class CreateRefreshTokenInterface(Protocol):
+class Cruds(Protocol):
+
     @abstractmethod
-    async def create_refresh_token(self, data: entities.AccessRefreshTokenDM) -> str:
-        ...
+    async def signup(self, params: UserDM) -> Optional[UserDataDM]: ...
 
-
-class VerifyTokenInterface(Protocol):
     @abstractmethod
-    async def verify_token(self, token: entities.TokenDM) -> Optional[str]:
-        ...
+    async def get_user_data(self, params: GetUserDM) -> Optional[UserPasswordDM]: ...
 
 
-class CreateNewUserInterface(Protocol):
+class DeleteUserTask(Protocol):
     @abstractmethod
-    async def create_new_user(self, user: entities.NewUserDM) -> Optional[Row[Any]]:
-        ...
+    async def schedule_user_deletion(self, params: DeleteUserTaskDM) -> None: ...
 
 
-
-class GetUserDataInterface(Protocol):
+class SendConfirmationEmail(Protocol):
     @abstractmethod
-    async def get_user_data(self, form_data: OAuth2Login) -> entities.UserDataDM:
-        ...
+    async def send_confirmation_email(self, params: SendConfirmEmailDM) -> None: ...
 
 
-class GetOAuthSchemeInterface(Protocol):
+class RedisService(Protocol):
     @abstractmethod
-    async def get_oauth_scheme(self, path: str) -> OAuth2PasswordBearerAuth:
-        ...
+    async def save_user(self, params: UserDM) -> None: ...
+
+    @abstractmethod
+    async def load_user(self, user_uuid: str) -> UserDM: ...
+
+    @abstractmethod
+    async def delete_user(self, user_uuid: str) -> None: ...
+
+    @abstractmethod
+    async def cancel_shedule_user_deletion(self, user_uuid: str) -> None: ...
+
+    @abstractmethod
+    async def save_revoked_tokens(self, params: RevokeTokensDM) -> None: ...
+
+    @abstractmethod
+    async def is_token_revoked(self, params: RevokeTokenDM) -> bool: ...
+
 
 class DBSession(Protocol):
     @abstractmethod
-    async def commit(self) -> None:
-        ...
+    async def commit(self) -> None: ...
 
     @abstractmethod
-    async def flush(self) -> None:
-        ...
+    async def flush(self) -> None: ...
+
+
+class UUIDGenerator(Protocol):
+    def __call__(self) -> UUID: ...
